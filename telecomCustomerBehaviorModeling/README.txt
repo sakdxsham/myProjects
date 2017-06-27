@@ -1,2 +1,2 @@
 Telecom Customer Behavior Modeling:
-•	Random forest & Logistic models were developed to predict the potential customer segments likely to churn
+Gradient Boosting & Logistic models were developed to predict the potential customer segments likely to churn
