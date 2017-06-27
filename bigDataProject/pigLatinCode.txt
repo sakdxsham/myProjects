@@ -1,0 +1,361 @@
+trainData = LOAD '/user/root/project/train_data.data' using PigStorage(',') AS
+			(age: int,
+             workclass:chararray,
+             fnlwgt:int,
+             education:chararray,
+             education_num:int,
+             marital_status:chararray,
+             occupation:chararray,
+             relationship:chararray,
+             race:chararray,
+             sex:chararray,
+             capital_gain:int,
+             capital_loss:int,
+             hpw:int,
+             native_cont:chararray,
+             salary:chararray);
+             
+t1 = LIMIT trainData 500; 
+
+DEFINE SRS datafu.pig.sampling.SimpleRandomSample('0.01');
+sampled = FOREACH trainData generate SRS(trainData);
+
+DEFINE split_into_training_testing(inputData, split_percentage)
+RETURNS training, testing
+{
+    data = foreach $inputData generate RANDOM() as random_assignment, *;
+    split data into testing_data if random_assignment <= $split_percentage, training_data otherwise;
+    $training = foreach training_data generate $1..;
+    $testing = foreach testing_data generate $1..;
+};
+
+training, testing = split_into_training_testing(trainData, 0.1);
+
+--Custome split function
+DEFINE split_into_2(inputData, split_percentage)
+RETURNS split1, split2
+{
+    data = foreach $inputData generate RANDOM() as random_assignment, *;
+    split data into split1 if random_assignment <= $split_percentage, split2 otherwise;
+    $split1 = foreach split1 generate $1..;
+    $split2 = foreach split2 generate $1..;
+};
+
+traina, trainb = split_into_2(trainData,0.33)
+trainb, trainc = split_into_2(trainb, 0.5)
+
+COUNT_A = FOREACH (GROUP traina ALL) GENERATE COUNT(traina);
+
+DEFINE split_into_3(inputData)
+RETURNS split1, split2, split3
+{
+    data = foreach $inputData generate RANDOM() as random_assignment, *;
+    split data into split1 if random_assignment <= 0.33, 
+    				split2 if random_assignment > 0.33 and random_assignment <= 0.66,
+                    split3 otherwise;   
+    $split1 = foreach split1 generate $1..;
+    $split2 = foreach split2 generate $1..;
+    $split3 = foreach split2 generate $1..;
+};
+
+--split the training data into 3 sets
+train1, train2, train3 = split_into_3(trainData);
+
+--count the number of records in each training set
+count1 = FOREACH (GROUP train1 ALL) GENERATE COUNT(train1);
+count2 = FOREACH (GROUP train2 ALL) GENERATE COUNT(train2);
+count3 = FOREACH (GROUP train3 ALL) GENERATE COUNT(train3);
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+train = LOAD '/user/root/project/train_data.data' using PigStorage(',') AS
+			(age: chararray,
+             workclass:chararray,
+             fnlwgt:chararray,
+             education:chararray,
+             education_num:chararray,
+             marital_status:chararray,
+             occupation:chararray,
+             relationship:chararray,
+             race:chararray,
+             sex:chararray,
+             capital_gain:chararray,
+             capital_loss:chararray,
+             hpw:chararray,
+             native_cont:chararray,
+             salary:chararray);
+             
+train1 = FOREACH train GENERATE
+         	 (int)REPLACE(age,'\\u003F',null) as age,
+             REPLACE(workclass,'\\u003F',null) as workclass,
+             REPLACE(fnlwgt,'\\u003F',null) as fnlwgt,
+             REPLACE(education,'\\u003F',null) as education,
+             REPLACE(education_num,'\\u003F',null) as education_num,
+             REPLACE(marital_status,'\\u003F',null) as marital_status,
+             REPLACE(occupation,'\\u003F',null) as occupation,
+             REPLACE(relationship,'\\u003F',null) as relationship,
+             REPLACE(race,'\\u003F',null) as race,
+             REPLACE(sex,'\\u003F',null) as sex,
+             (int)REPLACE(capital_gain,'\\u003F',null) as capital_gain,
+             (int)REPLACE(capital_loss,'\\u003F',null) as capital_loss,
+             (int)REPLACE(hpw,'\\u003F',null) as hpw,
+             REPLACE(native_cont,'\\u003F',null) as native_cont,
+             REPLACE(salary,'\\u003F',null) as salary;
+             
+        
+--Remove records with null values
+train2 = filter train1 by (age is not null) AND
+             (workclass is not null) AND
+             (fnlwgt is not null) AND
+             (education is not null) AND
+             (education_num  is not null) AND
+             (marital_status is not null) AND
+             (occupation is not null) AND
+             (relationship is not null) AND
+             (race is not null) AND
+             (sex is not null) AND
+             (capital_gain is not null) AND
+             (capital_loss is not null) AND
+             (hpw is not null) AND
+             (native_cont is not null) AND
+             (salary is not null);
+             
+--convert the target into a binary attribute: '1' for '>50k', '0' for '<=50k'
+trainData = FOREACH train2 GENERATE age..native_cont,
+            (salary == ' >50K'? '1':'0') as salary_greater_50k;
+
+-- sample out 25% data for feature selection 
+smpTrain = SAMPLE trainData 0.25;
+countsmp = FOREACH (GROUP smpTrain ALL) GENERATE COUNT(smpTrain);
+STORE smpTrain into '/user/root/project/smpTrain' using PigStorage(',');
+
+/*Custom split function
+divide into 33,67 and then divide 67 by 50%
+avoid this method */
+DEFINE split_into_2(inputData, split_percentage)
+RETURNS split1, split2
+{
+    data = foreach $inputData generate RANDOM() as random_assignment, *;
+    split data into split1 if random_assignment <= $split_percentage, split2 otherwise;
+    $split1 = foreach split1 generate $1..;
+    $split2 = foreach split2 generate $1..;
+};
+
+traina, trainb = split_into_2(trainData,0.33)
+trainb, trainc = split_into_2(trainb, 0.5)
+
+counta = FOREACH (GROUP traina ALL) GENERATE COUNT(traina);
+countb = FOREACH (GROUP trainb ALL) GENERATE COUNT(trainb);
+countc = FOREACH (GROUP trainc ALL) GENERATE COUNT(trainc);
+countsmp = FOREACH (GROUP trainc ALL) GENERATE COUNT(smpTrain);
+
+--UDF to split training data into 3sets
+DEFINE split_into_3(inputData)
+RETURNS split1, split2, split3
+{
+    data = foreach $inputData generate RANDOM() as random_assignment, *;
+    split data into split1 if random_assignment <= 0.33, 
+    				split2 if random_assignment > 0.33 and random_assignment <= 0.66,
+                    split3 otherwise;   
+    $split1 = foreach split1 generate $1..;
+    $split2 = foreach split2 generate $1..;
+    $split3 = foreach split2 generate $1..;
+};
+
+--split the training data into 3 sets
+train1, train2, train3 = split_into_3(trainData);
+
+--count the number of records in each training set
+count1 = FOREACH (GROUP train1 ALL) GENERATE COUNT(train1);
+count2 = FOREACH (GROUP train2 ALL) GENERATE COUNT(train2);
+count3 = FOREACH (GROUP train3 ALL) GENERATE COUNT(train3);
+
+-- store the three training sets 
+STORE train1 into '/user/root/project/train1' using PigStorage(',');
+STORE train2 into '/user/root/project/train2' using PigStorage(',');
+STORE train3 into '/user/root/project/train3' using PigStorage(',');
+
+/*No need to create dummy variables for categorical predictors because R implicitly creates 
+dummy variables if predictor is identified as a factor with more than one level */
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+train = LOAD '/user/root/project/train_data.data' using PigStorage(',') AS
+			(age:chararray,
+             workclass:chararray,
+             fnlwgt:chararray,
+             education:chararray,
+             education_num:chararray,
+             marital_status:chararray,
+             occupation:chararray,
+             relationship:chararray,
+             race:chararray,
+             sex:chararray,
+             capital_gain:chararray,
+             capital_loss:chararray,
+             hpw:chararray,
+             native_cont:chararray,
+             salary:chararray);
+
+-- we remove education_num as during exploration it was found to be a redundant predictor
+              
+train1 = FOREACH train GENERATE
+            (int)REPLACE(age,'\\u003F',null) as age,
+             REPLACE(workclass,'\\u003F',null) as workclass,
+             REPLACE(fnlwgt,'\\u003F',null) as fnlwgt,
+             REPLACE(education,'\\u003F',null) as education,
+         --  REPLACE(education_num,'\\u003F',null) as education_num,
+             REPLACE(marital_status,'\\u003F',null) as marital_status,
+             REPLACE(occupation,'\\u003F',null) as occupation,
+             REPLACE(relationship,'\\u003F',null) as relationship,
+             REPLACE(race,'\\u003F',null) as race,
+             REPLACE(sex,'\\u003F',null) as sex,
+             (int)REPLACE(capital_gain,'\\u003F',null) as capital_gain,
+             (int)REPLACE(capital_loss,'\\u003F',null) as capital_loss,
+             (int)REPLACE(hpw,'\\u003F',null) as hpw,
+             REPLACE(native_cont,'\\u003F',null) as native_cont,
+             REPLACE(salary,'\\u003F',null) as salary;
+             
+        
+--Remove records with null values
+train2 = filter train1 by (age is not null) AND
+             (workclass is not null) AND
+             (fnlwgt is not null) AND
+             (education is not null) AND
+             (education_num  is not null) AND
+             (marital_status is not null) AND
+             (occupation is not null) AND
+             (relationship is not null) AND
+             (race is not null) AND
+             (sex is not null) AND
+             (capital_gain is not null) AND
+             (capital_loss is not null) AND
+             (hpw is not null) AND
+             (native_cont is not null) AND
+             (salary is not null);
+             
+--convert the target into a binary attribute: '1' for '>50k', '0' for '<=50k'
+trainData = FOREACH train2 GENERATE age..native_cont,
+            (salary == ' >50K'? '1':'0') as salary_greater_50k;
+
+-- sample out 25% data for feature selection 
+smpTrain = SAMPLE trainData 0.25;
+countsmp = FOREACH (GROUP smpTrain ALL) GENERATE COUNT(smpTrain);
+STORE smpTrain into '/user/root/project/smpTrain' using PigStorage(',');
+
+/*Custom split function
+divide into 33,67 and then divide 67 by 50%
+avoid this method */
+DEFINE split_into_2(inputData, split_percentage)
+RETURNS split1, split2
+{
+    data = foreach $inputData generate RANDOM() as random_assignment, *;
+    split data into split1 if random_assignment <= $split_percentage, split2 otherwise;
+    $split1 = foreach split1 generate $1..;
+    $split2 = foreach split2 generate $1..;
+};
+
+traina, trainb = split_into_2(trainData,0.33)
+trainb, trainc = split_into_2(trainb, 0.5)
+
+counta = FOREACH (GROUP traina ALL) GENERATE COUNT(traina);
+countb = FOREACH (GROUP trainb ALL) GENERATE COUNT(trainb);
+countc = FOREACH (GROUP trainc ALL) GENERATE COUNT(trainc);
+countsmp = FOREACH (GROUP trainc ALL) GENERATE COUNT(smpTrain);
+
+--UDF to split training data into 3sets
+DEFINE split_into_3(inputData)
+RETURNS split1, split2, split3
+{
+    data = foreach $inputData generate RANDOM() as random_assignment, *;
+    split data into split1 if random_assignment <= 0.33, 
+    				split2 if random_assignment > 0.33 and random_assignment <= 0.66,
+                    split3 otherwise;   
+    $split1 = foreach split1 generate $1..;
+    $split2 = foreach split2 generate $1..;
+    $split3 = foreach split2 generate $1..;
+};
+
+--split the training data into 3 sets
+train1, train2, train3 = split_into_3(trainData);
+
+--count the number of records in each training set
+count1 = FOREACH (GROUP train1 ALL) GENERATE COUNT(train1);
+count2 = FOREACH (GROUP train2 ALL) GENERATE COUNT(train2);
+count3 = FOREACH (GROUP train3 ALL) GENERATE COUNT(train3);
+
+-- store the three training sets 
+STORE train1 into '/user/root/project/train1' using PigStorage(',');
+STORE train2 into '/user/root/project/train2' using PigStorage(',');
+STORE train3 into '/user/root/project/train3' using PigStorage(',');
+
+/*No need to create dummy variables for categorical predictors because R implicitly creates 
+dummy variables if predictor is identified as a factor with more than one level */
+
+--Load test data
+
+test= LOAD '/user/root/project/adult_test.test' using PigStorage(',') AS
+			( age:chararray,
+             workclass:chararray,
+             fnlwgt:chararray,
+             education:chararray,
+             education_num:chararray,
+             marital_status:chararray,
+             occupation:chararray,
+             relationship:chararray,
+             race:chararray,
+             sex:chararray,
+             capital_gain:chararray,
+             capital_loss:chararray,
+             hpw:chararray,
+             native_cont:chararray,
+             salary:chararray );
+
+            
+test1 = FOREACH test GENERATE
+         	 (int)REPLACE(age,'\\u003F',null) as age,
+             REPLACE(workclass,'\\u003F',null) as workclass,
+             REPLACE(fnlwgt,'\\u003F',null) as fnlwgt,
+             REPLACE(education,'\\u003F',null) as education,
+             REPLACE(education_num,'\\u003F',null) as education_num,
+             REPLACE(marital_status,'\\u003F',null) as marital_status,
+             REPLACE(occupation,'\\u003F',null) as occupation,
+             REPLACE(relationship,'\\u003F',null) as relationship,
+             REPLACE(race,'\\u003F',null) as race,
+             REPLACE(sex,'\\u003F',null) as sex,
+             (int)REPLACE(capital_gain,'\\u003F',null) as capital_gain,
+             (int)REPLACE(capital_loss,'\\u003F',null) as capital_loss,
+             (int)REPLACE(hpw,'\\u003F',null) as hpw,
+             REPLACE(native_cont,'\\u003F',null) as native_cont,
+             REPLACE(salary,'\\u003F',null) as salary;
+             
+--Remove records with null values
+test2 = filter test1 by (age is not null) AND
+             (workclass is not null) AND
+             (fnlwgt is not null) AND
+             (education is not null) AND
+             (education_num  is not null) AND
+             (marital_status is not null) AND
+             (occupation is not null) AND
+             (relationship is not null) AND
+             (race is not null) AND
+             (sex is not null) AND
+             (capital_gain is not null) AND
+             (capital_loss is not null) AND
+             (hpw is not null) AND
+             (native_cont is not null) AND
+             (salary is not null);
+             
+--convert the target into a binary attribute: '1' for '>50k', '0' for '<=50k'
+testData = FOREACH test2 GENERATE age..native_cont,
+            (salary == ' >50K.'? '1':'0') as salary_greater_50k;
+            
+--count the number of records remanining in  the test set after removing null values            
+count_test = FOREACH (GROUP testData ALL) GENERATE COUNT(testData);
+
+-- Store the test data            
+STORE testData INTO '/user/root/project/testData' using PigStorage(',');            
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------         
