@@ -336,7 +336,7 @@ aucNB <- performance(prediction(finalNBPredProb,test$salarymorethan50k),measure 
 print(c("Area Under the Curve: ", aucNB@y.values[[1]]),quote = FALSE)
 
 ```
-##Logistic Regression Model
+# Logistic Regression Model
 
 ```{r,message = FALSE,warning = FALSE}
 createLogisticModel <- function(trainData){
@@ -413,7 +413,7 @@ aucLog <- performance(prediction(finalLogPredProb,test$salarymorethan50k),measur
 print(c("Area Under the Curve: ", aucLog@y.values[[1]]),quote = FALSE)
 
 ```
-#Penalized Logistic Model: Does not work
+# Penalized Logistic Model: Does not work
 
 ```{r}
 createPenalizedModel <- function(trainData){
@@ -425,7 +425,7 @@ createPenalizedModel <- function(trainData){
 penModel1 <- createPenalizedModel(train1)
 ```
 
-#Support Vector Machine
+# Support Vector Machine
 
 ```{r}
 #Function to create SVM model and return predictions
