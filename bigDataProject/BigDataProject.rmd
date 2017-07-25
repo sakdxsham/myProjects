@@ -169,21 +169,7 @@ levels(smoteTrain3$occupation) <- c('Tech-support', 'Craft-repair', 'Other-servi
 
 levels(smoteTrain3$native_country) <- c('United-States', 'Cambodia', 'England', 'Puerto-Rico', 'Canada', 'Germany', 'Outlying-US(Guam-USVI-etc)', 'India', 'Japan', 'Greece', 'South', 'China', 'Cuba', 'Iran', 'Honduras', 'Philippines', 'Italy', 'Poland', 'Jamaica', 'Vietnam', 'Mexico', 'Portugal', 'Ireland', 'France', 'Dominican-Republic', 'Laos', 'Ecuador', 'Taiwan', 'Haiti', 'Columbia', 'Hungary', 'Guatemala', 'Nicaragua', 'Scotland', 'Thailand', 'Yugoslavia', 'El-Salvador', 'Trinadad&Tobago', 'Peru', 'Hong', 'Holand-Netherlands')
 
-#remove this part
-roseTrain1<-ROSE(salarymorethan50k ~ ., data = train1,seed =111)$data
-table(roseTrain1$salarymorethan50k)
 
-roseTrain2<-ROSE(salarymorethan50k ~ ., data = train2,seed =111)$data
-table(roseTrain2$salarymorethan50k)
-
-roseTrain3<-ROSE(salarymorethan50k ~ ., data = train3,seed =111)$data
-table(roseTrain3$salarymorethan50k)
-
-levels(roseTrain1$native_country) <- levels(train2$native_country)
-levels(roseTrain2$native_country) <- levels(train2$native_country)
-levels(roseTrain3$native_country) <- levels(train2$native_country)
-
-#till here
 ```
 # function that takes the majority vote
 
